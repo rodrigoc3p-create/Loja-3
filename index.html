@@ -437,6 +437,12 @@
   }
   .route-moto{
     filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));
+    transition:transform 3s linear;
+  }
+  #routeMotoIcon{
+    transform-box:fill-box;
+    transform-origin:center;
+    transition:transform 3s linear;
   }
   .route-moto circle.pulse{
     fill:none;
@@ -772,7 +778,7 @@
         <g class="route-moto" id="routeMoto">
           <circle r="12" class="pulse"/>
           <circle r="11" fill="#fff" stroke="#0f1c2e" stroke-width="1.5"/>
-          <text x="0" y="4" text-anchor="middle" font-size="13">🛵</text>
+          <text id="routeMotoIcon" x="0" y="4" text-anchor="middle" font-size="13">🛵</text>
         </g>
       </svg>
       <div class="route-chegou-tag" id="routeChegouTag">🔔 Chegou!</div>
@@ -1262,7 +1268,16 @@ function atualizarTrajeto(){
 
   routeDoneEl.style.strokeDashoffset = 600 - (600 * progress);
   const pt = routePathEl.getPointAtLength(routePathLen * progress);
+
+  // calcula o ângulo da estrada naquele ponto, pra moto "olhar" pra direção
+  // certa (dá a sensação de estar seguindo a rua, não só flutuando)
+  const antes = routePathEl.getPointAtLength(Math.max(0, routePathLen * progress - 3));
+  const depois = routePathEl.getPointAtLength(Math.min(routePathLen, routePathLen * progress + 3));
+  let angulo = Math.atan2(depois.y - antes.y, depois.x - antes.x) * 180 / Math.PI;
+  angulo = Math.max(-35, Math.min(35, angulo)); // limita a inclinação pra não ficar estranho
+
   routeMotoEl.setAttribute('transform', `translate(${pt.x}, ${pt.y})`);
+  document.getElementById('routeMotoIcon').style.transform = `rotate(${angulo}deg)`;
 }
 
 function tickTrajetoAoVivo(){
@@ -1293,7 +1308,7 @@ function aplicarPedidoNaTela(p){
   pararCronometroAoVivo();
   atualizarTrajeto();
   if(p.stage === 3){
-    liveTimerInterval = setInterval(tickTrajetoAoVivo, 15000);
+    liveTimerInterval = setInterval(tickTrajetoAoVivo, 3000);
   }
 
   statusPill.textContent = statusTextos[p.stage].pill;
