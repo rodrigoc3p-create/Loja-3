@@ -91,6 +91,47 @@
     border-bottom:1px solid var(--line);
   }
   .drawer-header h2{ font-size:16px; margin:0; font-weight:700; }
+  .drawer-tabs{
+    display:flex;
+    padding:10px 20px 0;
+    gap:6px;
+    border-bottom:1px solid var(--line);
+  }
+  .drawer-tab{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--muted);
+    padding:8px 4px 10px;
+    border-bottom:2px solid transparent;
+  }
+  .drawer-tab.active{ color:var(--route); border-color:var(--route); }
+  .pager{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid var(--line);
+  }
+  .pager-btn{
+    width:34px; height:34px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--panel);
+    font-size:16px;
+    cursor:pointer;
+    color:var(--ink);
+  }
+  .pager-btn:disabled{ opacity:.35; cursor:default; }
+  .pager-info{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    color:var(--muted);
+    min-width:80px;
+    text-align:center;
+  }
   .drawer-close{
     background:none; border:none; font-size:20px; cursor:pointer; color:var(--muted);
     width:32px; height:32px;
@@ -353,6 +394,72 @@
   }
   .stepper .time.live{ color:var(--amber); font-weight:700; }
 
+  .route-box{
+    display:none;
+    margin-top:20px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+  }
+  .route-box.show{ display:block; }
+  .route-box .route-label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:10px;
+    display:flex;
+    justify-content:space-between;
+  }
+  .route-svg{ width:100%; height:auto; display:block; }
+  .route-path{
+    fill:none;
+    stroke:var(--pending);
+    stroke-width:3;
+    stroke-dasharray:2 8;
+    stroke-linecap:round;
+  }
+  .route-path-done{
+    fill:none;
+    stroke:var(--amber);
+    stroke-width:3;
+    stroke-linecap:round;
+    stroke-dasharray:600;
+    stroke-dashoffset:600;
+    transition:stroke-dashoffset .6s linear;
+  }
+  .route-pin-label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;
+    fill:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+  .route-moto{
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));
+  }
+  .route-moto circle.pulse{
+    fill:none;
+    stroke:var(--amber);
+    stroke-width:2;
+    opacity:.6;
+    animation:route-pulse 1.8s ease-out infinite;
+    transform-origin:center;
+  }
+  @keyframes route-pulse{
+    0%{ transform:scale(1); opacity:.6; }
+    100%{ transform:scale(2.4); opacity:0; }
+  }
+  .route-chegou-tag{
+    display:none;
+    text-align:center;
+    font-weight:700;
+    font-size:12px;
+    color:var(--amber);
+    margin-top:8px;
+  }
+  .route-chegou-tag.show{ display:block; }
+
   .arrival-banner{
     display:none;
     background:var(--amber);
@@ -509,12 +616,20 @@
 <div class="drawer-overlay" id="drawerOverlay" onclick="fecharMenuPedidos()"></div>
 <div class="drawer" id="drawer">
   <div class="drawer-header">
-    <h2>Meus pedidos</h2>
+    <h2>Pedidos</h2>
     <button class="drawer-close" onclick="fecharMenuPedidos()">✕</button>
+  </div>
+  <div class="drawer-tabs">
+    <span class="drawer-tab active">📋 Pedidos</span>
   </div>
   <div class="drawer-body">
     <div class="pedidos-list" id="pedidosList">
       <span class="empty-msg">Nenhum pedido criado ainda.</span>
+    </div>
+    <div class="pager" id="pager" style="display:none;">
+      <button class="pager-btn" id="pagerPrev" onclick="paginaAnterior()">←</button>
+      <span class="pager-info" id="pagerInfo">Seção 1</span>
+      <button class="pager-btn" id="pagerNext" onclick="paginaSeguinte()">→</button>
     </div>
   </div>
 </div>
@@ -642,6 +757,27 @@
       </div>
     </div>
 
+    <div class="route-box" id="routeBox">
+      <div class="route-label">
+        <span>LOJA → CASA</span>
+        <span id="routeElapsed"></span>
+      </div>
+      <svg class="route-svg" viewBox="0 0 400 110">
+        <path class="route-path" d="M 25 85 C 90 25, 220 100, 375 30" />
+        <path class="route-path-done" id="routeDone" d="M 25 85 C 90 25, 220 100, 375 30" />
+        <circle cx="25" cy="85" r="4" fill="#0f1c2e"/>
+        <text x="25" y="102" class="route-pin-label" text-anchor="middle">Loja</text>
+        <circle cx="375" cy="30" r="4" fill="#0f1c2e"/>
+        <text x="375" y="18" class="route-pin-label" text-anchor="middle">Casa</text>
+        <g class="route-moto" id="routeMoto">
+          <circle r="12" class="pulse"/>
+          <circle r="11" fill="#fff" stroke="#0f1c2e" stroke-width="1.5"/>
+          <text x="0" y="4" text-anchor="middle" font-size="13">🛵</text>
+        </g>
+      </svg>
+      <div class="route-chegou-tag" id="routeChegouTag">🔔 Chegou!</div>
+    </div>
+
     <div class="arrival-banner" id="arrivalBanner">
       🔔 Entregador chegou! Está te aguardando na porta.
     </div>
@@ -765,6 +901,13 @@ function fmtHora(ts){
   const d = new Date(ts);
   return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 }
+function fmtDuracao(totalMin){
+  const min = Math.max(0, Math.round(totalMin));
+  if(min < 60) return min + ' min';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h + 'h' + String(m).padStart(2,'0') + 'min';
+}
 function fmtDataHora(ts){
   if(!ts) return '—';
   const d = new Date(ts);
@@ -814,19 +957,31 @@ function assinarListaPedidos(){
   });
 }
 
+const PEDIDOS_POR_PAGINA = 10;
+let paginaAtual = 1;
+
 function renderizarListaPedidos(){
   const numeros = Object.keys(pedidosCache).sort((a,b) => parseInt(b,10) - parseInt(a,10));
   const container = document.getElementById('pedidosList');
+  const pager = document.getElementById('pager');
 
   if(numeros.length === 0){
     container.innerHTML = '<span class="empty-msg">Nenhum pedido criado ainda.</span>';
+    pager.style.display = 'none';
     return;
   }
+
+  const totalPaginas = Math.max(1, Math.ceil(numeros.length / PEDIDOS_POR_PAGINA));
+  if(paginaAtual > totalPaginas) paginaAtual = totalPaginas;
+  if(paginaAtual < 1) paginaAtual = 1;
+
+  const inicio = (paginaAtual - 1) * PEDIDOS_POR_PAGINA;
+  const numerosPagina = numeros.slice(inicio, inicio + PEDIDOS_POR_PAGINA);
 
   const statusLabel = { 1:'Pedido feito', 2:'Preparando', 3:'Saiu p/ entrega', 4:'Chegou', 5:'Entregue' };
   const statusClass = { 1:'', 2:'', 3:'live', 4:'live', 5:'arrived' };
 
-  container.innerHTML = numeros.map(n => {
+  container.innerHTML = numerosPagina.map(n => {
     const p = pedidosCache[n];
     const sel = pedidoAtivo && pedidoAtivo.numero === n ? ' selected' : '';
     return `<div class="pedido-row${sel}" onclick="selecionarPedido('${n}')">
@@ -837,6 +992,24 @@ function renderizarListaPedidos(){
       <span class="pr-status ${statusClass[p.stage]}">${statusLabel[p.stage]}</span>
     </div>`;
   }).join('');
+
+  if(totalPaginas > 1){
+    pager.style.display = 'flex';
+    document.getElementById('pagerInfo').textContent = 'Seção ' + paginaAtual + ' de ' + totalPaginas;
+    document.getElementById('pagerPrev').disabled = paginaAtual <= 1;
+    document.getElementById('pagerNext').disabled = paginaAtual >= totalPaginas;
+  } else {
+    pager.style.display = 'none';
+  }
+}
+
+function paginaAnterior(){
+  paginaAtual--;
+  renderizarListaPedidos();
+}
+function paginaSeguinte(){
+  paginaAtual++;
+  renderizarListaPedidos();
 }
 
 function selecionarPedido(numero){
@@ -1043,8 +1216,58 @@ function atualizarCronometroSaiu(){
   if(!pedidoAtivo || !pedidoAtivo.ts3) return;
   const diffMin = Math.max(0, Math.floor((Date.now() - pedidoAtivo.ts3) / 60000));
   const el = document.getElementById('time3');
-  el.textContent = diffMin <= 0 ? 'agora mesmo' : 'há ' + diffMin + ' min';
+  el.textContent = diffMin <= 0 ? 'agora mesmo' : 'há ' + fmtDuracao(diffMin);
   el.classList.add('live');
+}
+
+// ---------------------------------------------------------------------------
+// Trajeto animado (loja → casa) — a motinha anda no ritmo de uma viagem de
+// ~20 minutos, calculada a partir do horário real de saída. Se a entrega for
+// confirmada ("Chegou") antes disso, ela pula direto pro ponto final.
+// ---------------------------------------------------------------------------
+const DURACAO_TRAJETO_MIN = 20;
+const routePathEl = document.querySelector('.route-path');
+const routePathLen = routePathEl.getTotalLength();
+const routeDoneEl = document.getElementById('routeDone');
+const routeMotoEl = document.getElementById('routeMoto');
+const routeBoxEl = document.getElementById('routeBox');
+const routeElapsedEl = document.getElementById('routeElapsed');
+const routeChegouTagEl = document.getElementById('routeChegouTag');
+
+function atualizarTrajeto(){
+  if(!pedidoAtivo || pedidoAtivo.stage < 3){
+    routeBoxEl.classList.remove('show');
+    return;
+  }
+  routeBoxEl.classList.add('show');
+
+  let progress;
+  if(pedidoAtivo.stage >= 4){
+    // chegada real confirmada — a motinha vai direto pro final, não importa
+    // se os 20 minutos estimados já passaram ou não
+    progress = 1;
+    routeChegouTagEl.classList.add('show');
+    if(pedidoAtivo.ts3 && pedidoAtivo.ts4){
+      const levouMin = Math.max(0, Math.round((pedidoAtivo.ts4 - pedidoAtivo.ts3) / 60000));
+      routeElapsedEl.textContent = 'levou ' + fmtDuracao(levouMin);
+    } else {
+      routeElapsedEl.textContent = '';
+    }
+  } else {
+    routeChegouTagEl.classList.remove('show');
+    const elapsedMin = pedidoAtivo.ts3 ? (Date.now() - pedidoAtivo.ts3) / 60000 : 0;
+    progress = Math.max(0, Math.min(0.80, elapsedMin / DURACAO_TRAJETO_MIN));
+    routeElapsedEl.textContent = 'estimativa ~' + fmtDuracao(DURACAO_TRAJETO_MIN);
+  }
+
+  routeDoneEl.style.strokeDashoffset = 600 - (600 * progress);
+  const pt = routePathEl.getPointAtLength(routePathLen * progress);
+  routeMotoEl.setAttribute('transform', `translate(${pt.x}, ${pt.y})`);
+}
+
+function tickTrajetoAoVivo(){
+  atualizarCronometroSaiu();
+  atualizarTrajeto();
 }
 
 function aplicarPedidoNaTela(p){
@@ -1068,8 +1291,9 @@ function aplicarPedidoNaTela(p){
   if(p.stage <= 5) marcarNode('node' + p.stage, p.stage === 5 ? 'done' : 'active');
 
   pararCronometroAoVivo();
+  atualizarTrajeto();
   if(p.stage === 3){
-    liveTimerInterval = setInterval(atualizarCronometroSaiu, 30000);
+    liveTimerInterval = setInterval(tickTrajetoAoVivo, 15000);
   }
 
   statusPill.textContent = statusTextos[p.stage].pill;
@@ -1280,7 +1504,8 @@ function assinarPedidoUnico(numero){
 Object.assign(window, {
   finalizarCompra, copiarMensagem, enviarParaEntregador, selecionarPedido,
   abrirMenuPedidos, fecharMenuPedidos,
-  abrirModalEdicao, fecharModalEdicao, salvarEdicaoPedido, excluirPedidoAtivo
+  abrirModalEdicao, fecharModalEdicao, salvarEdicaoPedido, excluirPedidoAtivo,
+  paginaAnterior, paginaSeguinte
 });
 window.__firebaseReady = true;
 </script>
