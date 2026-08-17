@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rastreio do pedido</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --ink:#0f1c2e;
+    --paper:#eef1ef;
+    --panel:#ffffff;
+    --line:#dde2df;
+    --route:#1c5c4c;
+    --route-light:#e6f0ec;
+    --amber:#e2a13d;
+    --amber-light:#fbf1e1;
+    --muted:#64716f;
+    --done:#1c5c4c;
+    --pending:#d7dcd9;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(15,28,46,.04), 0 6px 18px rgba(15,28,46,.06);
+    --shadow-sm:0 1px 2px rgba(15,28,46,.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Space Grotesk',sans-serif;
+    min-height:100vh;
+    padding:0;
+  }
+
+  /* ---- barra superior fixa (com o menu hambúrguer) ---- */
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    background:var(--ink);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 18px;
+    box-shadow:var(--shadow);
+  }
+  .topbar .brand{ font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .hamburger-btn{
+    background:none;
+    border:1px solid rgba(255,255,255,.25);
+    border-radius:8px;
+    width:38px; height:38px;
+    color:#fff;
+    font-size:18px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .hamburger-btn:hover{ background:rgba(255,255,255,.08); }
+
+  .page-wrap{
+    max-width:480px;
+    margin:0 auto;
+    padding:20px 16px 60px;
+  }
+  @media (min-width:900px){
+    .page-wrap{ max-width:640px; padding:32px 24px 80px; }
+    .topbar{ padding:16px 32px; }
+  }
+
+  /* ---- menu lateral (drawer) de pedidos ---- */
+  .drawer-overlay{
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(15,28,46,.5);
+    z-index:50;
+  }
+  .drawer-overlay.open{ display:block; }
+  .drawer{
+    position:fixed; top:0; right:-360px; bottom:0;
+    width:340px; max-width:88vw;
+    background:var(--panel);
+    z-index:51;
+    box-shadow:-8px 0 24px rgba(0,0,0,.18);
+    transition:right .25s ease;
+    display:flex; flex-direction:column;
+  }
+  .drawer.open{ right:0; }
+  .drawer-header{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:18px 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .drawer-header h2{ font-size:16px; margin:0; font-weight:700; }
+  .drawer-tabs{
+    display:flex;
+    padding:10px 20px 0;
+    gap:6px;
+    border-bottom:1px solid var(--line);
+  }
+  .drawer-tab{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--muted);
+    padding:8px 4px 10px;
+    border-bottom:2px solid transparent;
+  }
+  .drawer-tab.active{ color:var(--route); border-color:var(--route); }
+  .pager{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid var(--line);
+  }
+  .pager-btn{
+    width:34px; height:34px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--panel);
+    font-size:16px;
+    cursor:pointer;
+    color:var(--ink);
+  }
+  .pager-btn:disabled{ opacity:.35; cursor:default; }
+  .pager-info{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    color:var(--muted);
+    min-width:80px;
+    text-align:center;
+  }
+  .drawer-close{
+    background:none; border:none; font-size:20px; cursor:pointer; color:var(--muted);
+    width:32px; height:32px;
+  }
+  .drawer-body{ padding:14px 16px; overflow-y:auto; flex:1; }
+
+  /* ---- painel da loja: novo pedido ---- */
+  .order-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .order-card .cardlabel{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:12px;
+  }
+  .field{ margin-bottom:12px; }
+  .field label{
+    display:block;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:5px;
+  }
+  .field input{
+    width:100%;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  .field input:focus{ outline:2px solid var(--route); outline-offset:0; }
+  .gen-btn{
+    width:100%;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    background:var(--route);
+    color:#fff;
+    border:none;
+    border-radius:4px;
+    padding:11px 14px;
+    cursor:pointer;
+    margin-top:4px;
+  }
+  .gen-btn:disabled{ background:#a9b3b0; cursor:default; }
+  .status-msg{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    margin-top:8px;
+    line-height:1.5;
+  }
+  .status-msg.err{ color:#b3402f; }
+  .status-msg.ok{ color:var(--route); }
+
+  .link-preview{
+    margin-top:12px;
+    padding-top:12px;
+    border-top:1px dashed var(--line);
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    color:var(--muted);
+    line-height:1.6;
+    display:none;
+  }
+  .link-preview.show{ display:block; }
+  .link-preview b{ color:var(--ink); }
+  .link-preview .url{ color:var(--route); word-break:break-all; }
+  .wa-btn{
+    display:block;
+    text-align:center;
+    margin-top:12px;
+    background:#25D366;
+    color:#fff;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    text-decoration:none;
+    padding:11px 14px;
+    border-radius:4px;
+  }
+  .wa-btn.secondary{ background:#128C7E; margin-top:8px; }
+  .wa-btn.chegada{ background:var(--amber); color:var(--ink); }
+  .copy-btn{
+    display:block;
+    text-align:center;
+    margin-top:8px;
+    background:transparent;
+    color:var(--muted);
+    border:1px solid var(--line);
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    padding:9px 14px;
+    border-radius:4px;
+    cursor:pointer;
+    width:100%;
+  }
+
+  /* ---- painel da loja/entregador: controlar status ---- */
+  .dev-panel{
+    background:var(--ink);
+    color:var(--paper);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:18px 18px 16px;
+    margin-bottom:18px;
+  }
+  .dev-panel .tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:#9fb0ad;
+    display:block;
+    margin-bottom:10px;
+  }
+  .dev-panel .action-btn{
+    width:100%;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    background:var(--amber);
+    color:var(--ink);
+    border:none;
+    border-radius:4px;
+    padding:10px 14px;
+    cursor:pointer;
+  }
+  .dev-panel .action-btn.chegou-btn{ background:#e2843d; }
+  .dev-panel .action-btn:disabled{ background:#3c4a48; color:#8b9694; cursor:default; }
+  .readonly-msg{
+    font-size:12.5px;
+    color:#9fb0ad;
+    line-height:1.5;
+    font-style:italic;
+  }
+
+  /* ---- cabeçalho do pedido ---- */
+  .manifest{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    padding-bottom:18px;
+    margin-bottom:20px;
+  }
+  .manifest .id{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:.1em;
+    color:var(--muted);
+    text-transform:uppercase;
+    font-weight:600;
+  }
+  .manifest h1{ font-size:22px; margin:4px 0 0; font-weight:700; letter-spacing:-.01em; }
+  .manifest .status-pill{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    background:var(--pending);
+    color:var(--ink);
+    padding:7px 12px;
+    border-radius:20px;
+    white-space:nowrap;
+    align-self:flex-start;
+    transition:background .3s;
+    box-shadow:var(--shadow-sm);
+  }
+  .manifest .status-pill.live{ background:var(--route); color:#fff; }
+  .manifest .status-pill.arrived{ background:var(--amber); color:var(--ink); }
+
+  /* ---- barra de progresso horizontal estilo Amazon ---- */
+  .stepper-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:26px 16px 20px;
+    margin-bottom:18px;
+  }
+  .stepper{
+    display:flex;
+    align-items:flex-start;
+  }
+  .stepper .node{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    position:relative;
+  }
+  .stepper .circle{
+    width:26px; height:26px;
+    border-radius:50%;
+    background:var(--pending);
+    border:2px solid var(--pending);
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px;
+    font-weight:700;
+    color:#fff;
+    z-index:2;
+    flex-shrink:0;
+    transition:all .3s;
+  }
+  .stepper .node.done .circle{ background:var(--done); border-color:var(--done); box-shadow:var(--shadow-sm); }
+  .stepper .node.active .circle{
+    background:var(--amber); border-color:var(--amber); color:var(--ink);
+    box-shadow:0 0 0 5px rgba(226,161,61,.22);
+  }
+  .stepper .line{
+    position:absolute;
+    top:13px;
+    left:50%;
+    width:100%;
+    height:3px;
+    background:var(--pending);
+    border-radius:2px;
+    overflow:hidden;
+    z-index:1;
+  }
+  .stepper .node.done .line{ background:var(--done); }
+  .stepper .node:last-child .line{ display:none; }
+  .stepper .line-fill{
+    position:absolute;
+    top:0; left:-35%;
+    width:35%; height:100%;
+    background:var(--amber);
+    border-radius:2px;
+  }
+  .stepper .node.active .line-fill{ animation:line-slide 1.3s ease-in-out infinite; }
+  @keyframes line-slide{ 0%{ left:-35%; } 100%{ left:100%; } }
+  .stepper .label{
+    font-size:10.5px;
+    font-weight:600;
+    color:var(--muted);
+    margin-top:8px;
+    line-height:1.25;
+  }
+  .stepper .node.done .label, .stepper .node.active .label{ color:var(--ink); }
+  .stepper .time{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;
+    color:var(--muted);
+    margin-top:3px;
+  }
+  .stepper .time.live{ color:var(--amber); font-weight:700; }
+
+  .route-box{
+    display:none;
+    margin-top:20px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+  }
+  .route-box.show{ display:block; }
+  .route-box .route-label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:10px;
+    display:flex;
+    justify-content:space-between;
+  }
+  .route-svg{ width:100%; height:auto; display:block; }
+  .route-path{
+    fill:none;
+    stroke:var(--pending);
+    stroke-width:3;
+    stroke-dasharray:2 8;
+    stroke-linecap:round;
+  }
+  .route-path-done{
+    fill:none;
+    stroke:var(--amber);
+    stroke-width:3;
+    stroke-linecap:round;
+    stroke-dasharray:600;
+    stroke-dashoffset:600;
+    transition:stroke-dashoffset .6s linear;
+  }
+  .route-pin-label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;
+    fill:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+  .route-moto{
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.25));
+    transition:transform 3s linear;
+  }
+  #routeMotoIcon{
+    transform-box:fill-box;
+    transform-origin:center;
+    transition:transform 3s linear;
+  }
+  .route-moto circle.pulse{
+    fill:none;
+    stroke:var(--amber);
+    stroke-width:2;
+    opacity:.6;
+    animation:route-pulse 1.8s ease-out infinite;
+    transform-origin:center;
+  }
+  @keyframes route-pulse{
+    0%{ transform:scale(1); opacity:.6; }
+    100%{ transform:scale(2.4); opacity:0; }
+  }
+  .route-chegou-tag{
+    display:none;
+    text-align:center;
+    font-weight:700;
+    font-size:12px;
+    color:var(--amber);
+    margin-top:8px;
+  }
+  .route-chegou-tag.show{ display:block; }
+
+  .arrival-banner{
+    display:none;
+    background:var(--amber);
+    color:var(--ink);
+    font-weight:700;
+    font-size:14px;
+    text-align:center;
+    padding:14px;
+    border-radius:6px;
+    margin-top:16px;
+    animation:blink-banner 1.2s ease-in-out infinite;
+  }
+  .arrival-banner.show{ display:block; }
+  @keyframes blink-banner{
+    0%,100%{ box-shadow:0 0 0 0 rgba(232,161,61,.6); }
+    50%{ box-shadow:0 0 0 10px rgba(232,161,61,0); }
+  }
+
+  .info-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:18px 20px;
+    margin-bottom:16px;
+  }
+  .info-card .cardlabel{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:10px;
+  }
+  .info-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:13.5px;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .info-row:last-child{ border-bottom:none; }
+  .info-row .k{ color:var(--muted); font-weight:500; }
+  .info-row .v{ font-weight:700; text-align:right; color:var(--ink); }
+  .info-row.highlight .v{ font-size:15px; color:var(--route); }
+  .info-row .v.chip{
+    background:var(--route-light);
+    color:var(--route);
+    padding:4px 10px;
+    border-radius:6px;
+    font-family:'JetBrains Mono',monospace;
+    letter-spacing:.03em;
+  }
+
+  .admin-actions{ display:flex; gap:8px; margin-top:4px; }
+  .admin-actions button{
+    flex:1;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    padding:9px 10px;
+    border-radius:4px;
+    cursor:pointer;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--ink);
+  }
+  .admin-actions button.danger{ color:#b3402f; border-color:#e7c9c3; }
+
+  /* ---- lista de pedidos (menu hambúrguer) ---- */
+  .pedidos-list{ display:flex; flex-direction:column; gap:8px; }
+  .pedido-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:10px 12px;
+    cursor:pointer;
+    text-align:left;
+  }
+  .pedido-row.selected{ border-color:var(--route); background:#e7efec; }
+  .pedido-row .pr-left{ display:flex; flex-direction:column; }
+  .pedido-row .pr-numero{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); }
+  .pedido-row .pr-nome{ font-size:13.5px; font-weight:600; }
+  .pedido-row .pr-status{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    padding:4px 8px;
+    border-radius:2px;
+    background:var(--pending);
+    white-space:nowrap;
+  }
+  .pedido-row .pr-status.live{ background:var(--route); color:#fff; }
+  .pedido-row .pr-status.arrived{ background:var(--amber); }
+  .empty-msg{ font-size:12.5px; color:var(--muted); font-style:italic; }
+
+  .notify-btn{
+    display:block;
+    text-align:center;
+    margin-top:10px;
+    background:#25D366;
+    color:#fff;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    text-decoration:none;
+    padding:10px 14px;
+    border-radius:4px;
+  }
+
+  /* ---- modal de edição ---- */
+  .modal-overlay{
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(15,28,46,.5);
+    z-index:60;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{
+    background:var(--panel);
+    border-radius:var(--radius);
+    padding:20px;
+    width:100%; max-width:420px;
+    box-shadow:0 20px 50px rgba(0,0,0,.25);
+  }
+  .modal-box h3{ margin:0 0 14px; font-size:16px; }
+  .modal-actions{ display:flex; gap:8px; margin-top:14px; }
+  .modal-actions button{ flex:1; }
+
+  .foot{
+    text-align:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    color:var(--muted);
+    margin-top:22px;
+    letter-spacing:.04em;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="brand">📦 Rastreio</span>
+  <button class="hamburger-btn" id="hamburgerBtn" onclick="abrirMenuPedidos()" title="Meus pedidos">☰</button>
+</div>
+
+<div class="drawer-overlay" id="drawerOverlay" onclick="fecharMenuPedidos()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <h2>Pedidos</h2>
+    <button class="drawer-close" onclick="fecharMenuPedidos()">✕</button>
+  </div>
+  <div class="drawer-tabs">
+    <span class="drawer-tab active">📋 Pedidos</span>
+  </div>
+  <div class="drawer-body">
+    <div class="pedidos-list" id="pedidosList">
+      <span class="empty-msg">Nenhum pedido criado ainda.</span>
+    </div>
+    <div class="pager" id="pager" style="display:none;">
+      <button class="pager-btn" id="pagerPrev" onclick="paginaAnterior()">←</button>
+      <span class="pager-info" id="pagerInfo">Seção 1</span>
+      <button class="pager-btn" id="pagerNext" onclick="paginaSeguinte()">→</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <h3>Editar pedido</h3>
+    <div class="field">
+      <label>Nome do cliente</label>
+      <input type="text" id="mNome">
+    </div>
+    <div class="field">
+      <label>Endereço de entrega</label>
+      <input type="text" id="mEndereco">
+    </div>
+    <div class="field">
+      <label>WhatsApp do cliente</label>
+      <input type="tel" id="mTelefone">
+    </div>
+    <div class="modal-actions">
+      <button class="gen-btn" style="background:var(--panel); color:var(--ink); border:1px solid var(--line);" onclick="fecharModalEdicao()">Cancelar</button>
+      <button class="gen-btn" onclick="salvarEdicaoPedido()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="page-wrap">
+<div class="sheet">
+
+  <!-- ================= PAINEL DA LOJA: gerar pedido ================= -->
+  <div class="order-card" id="orderCard">
+    <div class="cardlabel">Novo pedido — gerado ao finalizar a compra</div>
+
+    <div class="field">
+      <label for="fNome">Nome do cliente</label>
+      <input type="text" id="fNome" placeholder="Ex: Mariana Souza">
+    </div>
+
+    <div class="field">
+      <label for="fEndereco">Endereço de entrega</label>
+      <input type="text" id="fEndereco" placeholder="Rua, número, bairro">
+    </div>
+
+    <div class="field">
+      <label for="fTelefone">WhatsApp do cliente</label>
+      <input type="tel" id="fTelefone" placeholder="(11) 9XXXX-XXXX">
+    </div>
+
+    <button class="gen-btn" id="genBtn" onclick="finalizarCompra()">Finalizar compra e gerar rastreio</button>
+    <div class="status-msg" id="statusMsg"></div>
+
+    <div class="link-preview" id="linkPreview">
+      Pedido <b id="lpNumero">—</b> gerado para <b id="lpNome">—</b>:<br>
+      <span class="url" id="lpUrl">—</span>
+      <a id="waBtn" href="#" target="_blank" rel="noopener" class="wa-btn">Enviar pro cliente pelo WhatsApp</a>
+      <button type="button" class="copy-btn" id="copyBtn" onclick="copiarMensagem()">Copiar mensagem do cliente</button>
+    </div>
+  </div>
+
+  <div class="order-card" id="entregadorCard" style="display:none;">
+    <div class="cardlabel">Atribuir entregador — pode ser feito a qualquer momento</div>
+    <div class="field">
+      <label for="fTelefoneEntregador">WhatsApp do entregador</label>
+      <input type="tel" id="fTelefoneEntregador" placeholder="(11) 9XXXX-XXXX">
+    </div>
+    <button class="gen-btn" onclick="enviarParaEntregador()">Enviar link pro entregador</button>
+    <div class="status-msg" id="statusMsgEntregador"></div>
+    <div class="link-preview" id="entregadorPreview">
+      <a id="waEntregadorBtn" href="#" target="_blank" rel="noopener" class="wa-btn secondary">Enviar pro entregador pelo WhatsApp</a>
+    </div>
+  </div>
+
+  <!-- ================= PAINEL DE STATUS: usado pela loja e pelo entregador ================= -->
+  <div class="dev-panel" id="devPanel" style="opacity:.4; pointer-events:none;">
+    <span class="tag" id="devLabel">Painel de status — selecione um pedido</span>
+    <div class="field" id="fieldRecebedor" style="margin-bottom:10px; display:none;">
+      <label for="fRecebedor" style="color:#9fb0ad;">Nome de quem recebeu</label>
+      <input type="text" id="fRecebedor" placeholder="Ex: Mariana Souza" style="background:#1c2c2a; color:#fff; border-color:#2f3f3d;">
+    </div>
+    <button class="action-btn" id="devBtn" onclick="avancarStatus()">Marcar: preparando</button>
+    <div class="readonly-msg" id="readonlyMsg" style="display:none;"></div>
+    <a id="notifyBtn" href="#" target="_blank" rel="noopener" class="notify-btn" style="display:none;">Notificar cliente pelo WhatsApp</a>
+    <a id="waArrivalBtn" href="#" target="_blank" rel="noopener" class="wa-btn chegada" style="display:none;">🔔 Avisar cliente que chegou</a>
+  </div>
+
+  <!-- ================= TELA DE RASTREIO (loja / cliente / entregador) ================= -->
+  <div class="manifest">
+    <div>
+      <div class="id" id="manifestId">Pedido — aguardando geração</div>
+      <h1 id="mainTitle">Assim que o pedido for criado, o rastreio aparece aqui</h1>
+    </div>
+    <div class="status-pill" id="statusPill">—</div>
+  </div>
+
+  <div class="stepper-card">
+    <div class="stepper" id="stepper">
+      <div class="node done" id="node1">
+        <div class="line"><div class="line-fill"></div></div>
+        <div class="circle">✓</div>
+        <div class="label">Pedido feito</div>
+        <div class="time" id="time1">—</div>
+      </div>
+      <div class="node" id="node2">
+        <div class="line"><div class="line-fill"></div></div>
+        <div class="circle">2</div>
+        <div class="label">Preparando</div>
+        <div class="time" id="time2">—</div>
+      </div>
+      <div class="node" id="node3">
+        <div class="line"><div class="line-fill"></div></div>
+        <div class="circle">3</div>
+        <div class="label">Saiu p/ entrega</div>
+        <div class="time" id="time3">—</div>
+      </div>
+      <div class="node" id="node4">
+        <div class="line"><div class="line-fill"></div></div>
+        <div class="circle">4</div>
+        <div class="label">Chegou</div>
+        <div class="time" id="time4">—</div>
+      </div>
+      <div class="node" id="node5">
+        <div class="circle">5</div>
+        <div class="label">Entregue</div>
+        <div class="time" id="time5">—</div>
+      </div>
+    </div>
+
+    <div class="route-box" id="routeBox">
+      <div class="route-label">
+        <span>LOJA → CASA</span>
+        <span id="routeElapsed"></span>
+      </div>
+      <svg class="route-svg" viewBox="0 0 400 110">
+        <path class="route-path" d="M 25 85 C 90 25, 220 100, 375 30" />
+        <path class="route-path-done" id="routeDone" d="M 25 85 C 90 25, 220 100, 375 30" />
+        <circle cx="25" cy="85" r="4" fill="#0f1c2e"/>
+        <text x="25" y="102" class="route-pin-label" text-anchor="middle">Loja</text>
+        <circle cx="375" cy="30" r="4" fill="#0f1c2e"/>
+        <text x="375" y="18" class="route-pin-label" text-anchor="middle">Casa</text>
+        <g class="route-moto" id="routeMoto">
+          <circle r="12" class="pulse"/>
+          <circle r="11" fill="#fff" stroke="#0f1c2e" stroke-width="1.5"/>
+          <text id="routeMotoIcon" x="0" y="4" text-anchor="middle" font-size="13">🛵</text>
+        </g>
+      </svg>
+      <div class="route-chegou-tag" id="routeChegouTag">🔔 Chegou!</div>
+    </div>
+
+    <div class="arrival-banner" id="arrivalBanner">
+      🔔 Entregador chegou! Está te aguardando na porta.
+    </div>
+  </div>
+
+  <div class="info-card">
+    <div class="cardlabel">Detalhes do pedido</div>
+    <div class="info-row"><span class="k">Número</span><span class="v chip" id="infoNumero">—</span></div>
+    <div class="info-row highlight"><span class="k">Destinatário</span><span class="v" id="infoNome">—</span></div>
+    <div class="info-row"><span class="k">Endereço de entrega</span><span class="v" id="infoEndereco">—</span></div>
+    <div class="info-row" id="infoRecebedorRow" style="display:none;"><span class="k">Recebido por</span><span class="v" id="infoRecebedor">—</span></div>
+    <div class="info-row" id="infoDataHoraRow" style="display:none;"><span class="k">Data/hora do recebimento</span><span class="v" id="infoDataHora">—</span></div>
+  </div>
+
+  <div class="admin-actions" id="adminActions" style="display:none;">
+    <button onclick="abrirModalEdicao()">✏️ Editar</button>
+    <button class="danger" onclick="excluirPedidoAtivo()">🗑️ Excluir</button>
+  </div>
+
+  <div class="foot">O pedido só é dado como entregue quando confirmado manualmente</div>
+</div>
+</div>
+
+<script>
+// Esta checagem roda ANTES de qualquer tentativa de carregar o Firebase —
+// assim, mesmo se o arquivo for aberto localmente (sem internet) e o módulo
+// abaixo nunca conseguir carregar, o aviso ainda aparece pra pessoa.
+(function checarProtocolo(){
+  if(window.location.protocol !== 'http:' && window.location.protocol !== 'https:'){
+    window.__rastreioBloqueado = true;
+    document.body.innerHTML = `
+      <div style="max-width:480px; margin:0 auto; padding:40px 20px; font-family:'Space Grotesk',sans-serif;">
+        <div style="background:#b3402f; color:#fff; border-radius:12px; padding:24px; text-align:center;">
+          <div style="font-size:34px; margin-bottom:10px;">⚠️</div>
+          <div style="font-weight:700; font-size:17px; margin-bottom:10px;">Este arquivo está sendo aberto localmente</div>
+          <div style="font-size:14px; line-height:1.6;">
+            Você abriu o arquivo direto do seu celular (endereço começando com <b>${window.location.protocol}</b>).<br><br>
+            Nesse modo, o sistema <b>não consegue conectar no banco de dados</b> — é uma limitação de segurança do navegador, não é bug.<br><br>
+            Pra tudo funcionar direito, acesse pelo <b>link publicado</b> (ex: <code>https://seu-usuario.github.io/...</code>), não pelo arquivo baixado.
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+  // se o Firebase não terminar de carregar em 6s, avisa em vez de ficar tudo travado
+  setTimeout(() => {
+    if(!window.__firebaseReady && !window.__rastreioBloqueado){
+      const aviso = document.createElement('div');
+      aviso.style.cssText = 'position:fixed; top:0; left:0; right:0; background:#b3402f; color:#fff; padding:14px 18px; font-family:sans-serif; font-size:13px; text-align:center; z-index:999;';
+      aviso.textContent = '⚠️ Não consegui conectar no banco de dados. Verifique sua internet e recarregue a página.';
+      document.body.prepend(aviso);
+    }
+  }, 6000);
+})();
+</script>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Firebase — conexão com o banco de dados real (Firestore)
+// ---------------------------------------------------------------------------
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+import {
+  getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, orderBy
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCI5NI214HPXdNqFZIfbUdyRko-SBDkQjY",
+  authDomain: "rastreio-loja-2f3e2.firebaseapp.com",
+  projectId: "rastreio-loja-2f3e2",
+  storageBucket: "rastreio-loja-2f3e2.firebasestorage.app",
+  messagingSenderId: "646425032123",
+  appId: "1:646425032123:web:d8b83ac76475840a9f009e"
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+async function salvarPedido(pedido){
+  try{
+    await setDoc(doc(db, 'pedidos', pedido.numero), pedido, { merge: true });
+    return true;
+  } catch(e){
+    setStatus('Não consegui salvar no banco de dados: ' + e.message, 'err');
+    return false;
+  }
+}
+
+async function apagarPedido(numero){
+  try{
+    await deleteDoc(doc(db, 'pedidos', numero));
+    return true;
+  } catch(e){
+    alert('Não consegui excluir: ' + e.message);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Estado em memória
+// ---------------------------------------------------------------------------
+let stage = 1; // 1=pedido feito, 2=preparando, 3=saiu para entrega, 4=chegou, 5=entregue
+let pedidoAtivo = null;
+let mensagemAtual = '';
+let modoLoja = false;
+let modoEntregador = false;
+let pedidosCache = {};
+let liveTimerInterval = null;
+
+const statusPill = document.getElementById('statusPill');
+const mainTitle = document.getElementById('mainTitle');
+const devBtn = document.getElementById('devBtn');
+const devLabel = document.getElementById('devLabel');
+const notifyBtn = document.getElementById('notifyBtn');
+const waArrivalBtn = document.getElementById('waArrivalBtn');
+
+function fmtNow(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function fmtHora(ts){
+  if(!ts) return '—';
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function fmtDuracao(totalMin){
+  const min = Math.max(0, Math.round(totalMin));
+  if(min < 60) return min + ' min';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h + 'h' + String(m).padStart(2,'0') + 'min';
+}
+function fmtDataHora(ts){
+  if(!ts) return '—';
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return dd + '/' + mm + ' às ' + hh + ':' + mi;
+}
+
+function setStatus(msg, tipo){
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status-msg' + (tipo ? ' ' + tipo : '');
+}
+
+// ---------------------------------------------------------------------------
+// Menu hambúrguer (drawer) com a lista de pedidos
+// ---------------------------------------------------------------------------
+function abrirMenuPedidos(){
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+function fecharMenuPedidos(){
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+// ---------------------------------------------------------------------------
+// Lista de pedidos da loja — em tempo real, direto do Firestore
+// ---------------------------------------------------------------------------
+function assinarListaPedidos(){
+  const q = query(collection(db, 'pedidos'), orderBy('numero', 'asc'));
+  onSnapshot(q, (snapshot) => {
+    pedidosCache = {};
+    snapshot.forEach(d => { pedidosCache[d.id] = d.data(); });
+    renderizarListaPedidos();
+
+    if(pedidoAtivo && pedidosCache[pedidoAtivo.numero]){
+      pedidoAtivo = pedidosCache[pedidoAtivo.numero];
+      stage = pedidoAtivo.stage;
+      aplicarPedidoNaTela(pedidoAtivo);
+      atualizarPainelStatus();
+    }
+  }, (err) => {
+    setStatus('Erro ao conectar no banco de dados: ' + err.message, 'err');
+  });
+}
+
+const PEDIDOS_POR_PAGINA = 10;
+let paginaAtual = 1;
+
+function renderizarListaPedidos(){
+  const numeros = Object.keys(pedidosCache).sort((a,b) => parseInt(b,10) - parseInt(a,10));
+  const container = document.getElementById('pedidosList');
+  const pager = document.getElementById('pager');
+
+  if(numeros.length === 0){
+    container.innerHTML = '<span class="empty-msg">Nenhum pedido criado ainda.</span>';
+    pager.style.display = 'none';
+    return;
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil(numeros.length / PEDIDOS_POR_PAGINA));
+  if(paginaAtual > totalPaginas) paginaAtual = totalPaginas;
+  if(paginaAtual < 1) paginaAtual = 1;
+
+  const inicio = (paginaAtual - 1) * PEDIDOS_POR_PAGINA;
+  const numerosPagina = numeros.slice(inicio, inicio + PEDIDOS_POR_PAGINA);
+
+  const statusLabel = { 1:'Pedido feito', 2:'Preparando', 3:'Saiu p/ entrega', 4:'Chegou', 5:'Entregue' };
+  const statusClass = { 1:'', 2:'', 3:'live', 4:'live', 5:'arrived' };
+
+  container.innerHTML = numerosPagina.map(n => {
+    const p = pedidosCache[n];
+    const sel = pedidoAtivo && pedidoAtivo.numero === n ? ' selected' : '';
+    return `<div class="pedido-row${sel}" onclick="selecionarPedido('${n}')">
+      <div class="pr-left">
+        <span class="pr-numero">#${n}</span>
+        <span class="pr-nome">${p.nome}</span>
+      </div>
+      <span class="pr-status ${statusClass[p.stage]}">${statusLabel[p.stage]}</span>
+    </div>`;
+  }).join('');
+
+  if(totalPaginas > 1){
+    pager.style.display = 'flex';
+    document.getElementById('pagerInfo').textContent = 'Seção ' + paginaAtual + ' de ' + totalPaginas;
+    document.getElementById('pagerPrev').disabled = paginaAtual <= 1;
+    document.getElementById('pagerNext').disabled = paginaAtual >= totalPaginas;
+  } else {
+    pager.style.display = 'none';
+  }
+}
+
+function paginaAnterior(){
+  paginaAtual--;
+  renderizarListaPedidos();
+}
+function paginaSeguinte(){
+  paginaAtual++;
+  renderizarListaPedidos();
+}
+
+function selecionarPedido(numero){
+  const p = pedidosCache[numero];
+  if(!p) return;
+  pedidoAtivo = p;
+  stage = p.stage;
+  aplicarPedidoNaTela(p);
+  renderizarListaPedidos();
+  atualizarPainelStatus();
+  fecharMenuPedidos();
+}
+
+// ---------------------------------------------------------------------------
+// Gerar pedido — numeração sequencial começando em #101
+// ---------------------------------------------------------------------------
+function proximoNumeroPedido(){
+  const numeros = Object.keys(pedidosCache).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+  if(numeros.length === 0) return '101';
+  return String(Math.max(...numeros) + 1);
+}
+
+async function encurtarLink(url){
+  try{
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const resp = await fetch('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(url), { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if(!resp.ok) throw new Error('status ' + resp.status);
+    const short = (await resp.text()).trim();
+    if(short.startsWith('http')) return short;
+    throw new Error('resposta inesperada do encurtador');
+  } catch(e){
+    return url;
+  }
+}
+
+async function finalizarCompra(){
+  const nome = document.getElementById('fNome').value.trim();
+  const endereco = document.getElementById('fEndereco').value.trim();
+  const telefoneRaw = document.getElementById('fTelefone').value.trim();
+
+  if(!nome || !telefoneRaw || !endereco){
+    setStatus('Preencha nome, endereço de entrega e WhatsApp do cliente.', 'err');
+    return;
+  }
+
+  const numero = proximoNumeroPedido();
+  let telefoneDigits = telefoneRaw.replace(/\D/g, '').replace(/^0+/, '');
+  if(!telefoneDigits.startsWith('55')) telefoneDigits = '55' + telefoneDigits;
+
+  const baseUrl = window.location.origin + window.location.pathname;
+  const params = new URLSearchParams();
+  params.set('numero', numero);
+  params.set('nome', nome);
+  params.set('endereco', endereco);
+  params.set('tel', telefoneDigits);
+  const url = baseUrl + '?' + params.toString();
+
+  const genBtn = document.getElementById('genBtn');
+  genBtn.disabled = true;
+  setStatus('Salvando pedido...', '');
+
+  const agora = Date.now();
+  const pedido = {
+    numero, nome, endereco, telefoneDigits, url, urlCurto: url,
+    stage: 1, recebedor: '',
+    criadoEm: agora,
+    ts1: agora, ts2: null, ts3: null, ts4: null, ts5: null
+  };
+  const ok = await salvarPedido(pedido);
+  if(!ok){ genBtn.disabled = false; return; }
+
+  pedidoAtivo = pedido;
+  stage = 1;
+  aplicarPedidoNaTela(pedido);
+  atualizarPainelStatus();
+
+  document.getElementById('lpNumero').textContent = '#' + numero;
+  document.getElementById('lpNome').textContent = nome;
+  document.getElementById('lpUrl').textContent = 'Encurtando link...';
+  document.getElementById('linkPreview').classList.add('show');
+
+  const urlCurto = await encurtarLink(url);
+  pedido.urlCurto = urlCurto;
+  await salvarPedido(pedido);
+  document.getElementById('lpUrl').textContent = urlCurto;
+
+  const mensagem = 'Oi, ' + nome.split(' ')[0] + '! Seu pedido #' + numero + ' foi confirmado 📦. Acompanhe a entrega em tempo real: ' + urlCurto;
+  mensagemAtual = mensagem;
+  document.getElementById('waBtn').href = 'https://wa.me/' + telefoneDigits + '?text=' + encodeURIComponent(mensagem);
+
+  document.getElementById('entregadorCard').style.display = 'block';
+
+  // limpa o formulário automaticamente pra já poder cadastrar o próximo pedido
+  document.getElementById('fNome').value = '';
+  document.getElementById('fEndereco').value = '';
+  document.getElementById('fTelefone').value = '';
+  genBtn.disabled = false;
+  setStatus('Pedido #' + numero + ' gerado com sucesso.', 'ok');
+}
+
+function copiarMensagem(){
+  if(!mensagemAtual) return;
+  navigator.clipboard.writeText(mensagemAtual).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const original = btn.textContent;
+    btn.textContent = 'Copiado! Cole no WhatsApp';
+    setTimeout(() => { btn.textContent = original; }, 2500);
+  }).catch(() => {
+    setStatus('Não consegui copiar automaticamente. Selecione e copie o link manualmente.', 'err');
+  });
+}
+
+async function enviarParaEntregador(){
+  if(!pedidoAtivo){
+    document.getElementById('statusMsgEntregador').textContent = 'Selecione ou gere um pedido primeiro.';
+    document.getElementById('statusMsgEntregador').className = 'status-msg err';
+    return;
+  }
+  const telefoneEntregadorRaw = document.getElementById('fTelefoneEntregador').value.trim();
+  if(!telefoneEntregadorRaw){
+    document.getElementById('statusMsgEntregador').textContent = 'Informe o WhatsApp do entregador.';
+    document.getElementById('statusMsgEntregador').className = 'status-msg err';
+    return;
+  }
+  let telEntregadorDigits = telefoneEntregadorRaw.replace(/\D/g, '').replace(/^0+/, '');
+  if(!telEntregadorDigits.startsWith('55')) telEntregadorDigits = '55' + telEntregadorDigits;
+
+  document.getElementById('statusMsgEntregador').textContent = 'Encurtando link...';
+  document.getElementById('statusMsgEntregador').className = 'status-msg';
+
+  const urlEntregador = pedidoAtivo.url + '&entregador=1';
+  const urlEntregadorCurto = await encurtarLink(urlEntregador);
+  const mensagemEntregador = 'Pedido #' + pedidoAtivo.numero + ' pronto pra saída — ' + pedidoAtivo.nome + ', ' + pedidoAtivo.endereco + '. Acompanhe e marque o status aqui: ' + urlEntregadorCurto;
+
+  const waEntregadorBtn = document.getElementById('waEntregadorBtn');
+  waEntregadorBtn.href = 'https://wa.me/' + telEntregadorDigits + '?text=' + encodeURIComponent(mensagemEntregador);
+  document.getElementById('entregadorPreview').classList.add('show');
+  document.getElementById('statusMsgEntregador').textContent = 'Link pronto — pode reenviar pra outro entregador a qualquer momento, se precisar trocar.';
+  document.getElementById('statusMsgEntregador').className = 'status-msg ok';
+}
+
+// ---------------------------------------------------------------------------
+// Editar / excluir pedido (só a loja)
+// ---------------------------------------------------------------------------
+function abrirModalEdicao(){
+  if(!pedidoAtivo || !modoLoja) return;
+  document.getElementById('mNome').value = pedidoAtivo.nome;
+  document.getElementById('mEndereco').value = pedidoAtivo.endereco;
+  document.getElementById('mTelefone').value = pedidoAtivo.telefoneDigits;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function fecharModalEdicao(){
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+async function salvarEdicaoPedido(){
+  if(!pedidoAtivo) return;
+  const nome = document.getElementById('mNome').value.trim();
+  const endereco = document.getElementById('mEndereco').value.trim();
+  let telefoneDigits = document.getElementById('mTelefone').value.trim().replace(/\D/g, '').replace(/^0+/, '');
+  if(telefoneDigits && !telefoneDigits.startsWith('55')) telefoneDigits = '55' + telefoneDigits;
+  if(!nome || !endereco){ return; }
+  const atualizado = { ...pedidoAtivo, nome, endereco, telefoneDigits };
+  await salvarPedido(atualizado);
+  fecharModalEdicao();
+}
+async function excluirPedidoAtivo(){
+  if(!pedidoAtivo || !modoLoja) return;
+  if(!confirm('Excluir o pedido #' + pedidoAtivo.numero + ' permanentemente?')) return;
+  const numero = pedidoAtivo.numero;
+  await apagarPedido(numero);
+  pedidoAtivo = null;
+  document.getElementById('manifestId').textContent = 'Pedido — aguardando geração';
+  mainTitle.textContent = 'Selecione ou crie um pedido';
+  document.getElementById('adminActions').style.display = 'none';
+  atualizarPainelStatus();
+}
+
+// ---------------------------------------------------------------------------
+// Aplicar os dados de um pedido na tela de rastreio (stepper + detalhes)
+// ---------------------------------------------------------------------------
+function marcarNode(id, estado){
+  const node = document.getElementById(id);
+  node.classList.remove('done','active');
+  if(estado) node.classList.add(estado);
+  const circle = node.querySelector('.circle');
+  circle.textContent = estado === 'done' ? '✓' : id.slice(-1);
+}
+
+const statusTextos = {
+  1: { pill: 'Pedido feito', titulo: n => 'Oi, ' + n + '! Seu pedido foi confirmado' },
+  2: { pill: 'Preparando', titulo: () => 'Seu pedido está sendo preparado' },
+  3: { pill: 'Saiu para entrega', titulo: () => 'Seu pedido está a caminho' },
+  4: { pill: 'Chegou', titulo: () => 'Seu pedido chegou!' },
+  5: { pill: 'Entregue', titulo: () => 'Pedido entregue!' }
+};
+
+function pararCronometroAoVivo(){
+  if(liveTimerInterval){ clearInterval(liveTimerInterval); liveTimerInterval = null; }
+}
+
+function atualizarCronometroSaiu(){
+  if(!pedidoAtivo || !pedidoAtivo.ts3) return;
+  const diffMin = Math.max(0, Math.floor((Date.now() - pedidoAtivo.ts3) / 60000));
+  const el = document.getElementById('time3');
+  el.textContent = diffMin <= 0 ? 'agora mesmo' : 'há ' + fmtDuracao(diffMin);
+  el.classList.add('live');
+}
+
+// ---------------------------------------------------------------------------
+// Trajeto animado (loja → casa) — a motinha anda no ritmo de uma viagem de
+// ~20 minutos, calculada a partir do horário real de saída. Se a entrega for
+// confirmada ("Chegou") antes disso, ela pula direto pro ponto final.
+// ---------------------------------------------------------------------------
+const DURACAO_TRAJETO_MIN = 20;
+const routePathEl = document.querySelector('.route-path');
+const routePathLen = routePathEl.getTotalLength();
+const routeDoneEl = document.getElementById('routeDone');
+const routeMotoEl = document.getElementById('routeMoto');
+const routeBoxEl = document.getElementById('routeBox');
+const routeElapsedEl = document.getElementById('routeElapsed');
+const routeChegouTagEl = document.getElementById('routeChegouTag');
+
+function atualizarTrajeto(){
+  if(!pedidoAtivo || pedidoAtivo.stage < 3){
+    routeBoxEl.classList.remove('show');
+    return;
+  }
+  routeBoxEl.classList.add('show');
+
+  let progress;
+  if(pedidoAtivo.stage >= 4){
+    // chegada real confirmada — a motinha vai direto pro final, não importa
+    // se os 20 minutos estimados já passaram ou não
+    progress = 1;
+    routeChegouTagEl.classList.add('show');
+    if(pedidoAtivo.ts3 && pedidoAtivo.ts4){
+      const levouMin = Math.max(0, Math.round((pedidoAtivo.ts4 - pedidoAtivo.ts3) / 60000));
+      routeElapsedEl.textContent = 'levou ' + fmtDuracao(levouMin);
+    } else {
+      routeElapsedEl.textContent = '';
+    }
+  } else {
+    routeChegouTagEl.classList.remove('show');
+    const elapsedMin = pedidoAtivo.ts3 ? (Date.now() - pedidoAtivo.ts3) / 60000 : 0;
+    progress = Math.max(0, Math.min(0.80, elapsedMin / DURACAO_TRAJETO_MIN));
+    routeElapsedEl.textContent = 'estimativa ~' + fmtDuracao(DURACAO_TRAJETO_MIN);
+  }
+
+  routeDoneEl.style.strokeDashoffset = 600 - (600 * progress);
+  const pt = routePathEl.getPointAtLength(routePathLen * progress);
+
+  // calcula o ângulo da estrada naquele ponto, pra moto "olhar" pra direção
+  // certa (dá a sensação de estar seguindo a rua, não só flutuando)
+  const antes = routePathEl.getPointAtLength(Math.max(0, routePathLen * progress - 3));
+  const depois = routePathEl.getPointAtLength(Math.min(routePathLen, routePathLen * progress + 3));
+  let angulo = Math.atan2(depois.y - antes.y, depois.x - antes.x) * 180 / Math.PI;
+  angulo = Math.max(-35, Math.min(35, angulo)); // limita a inclinação pra não ficar estranho
+
+  routeMotoEl.setAttribute('transform', `translate(${pt.x}, ${pt.y})`);
+  document.getElementById('routeMotoIcon').style.transform = `rotate(${angulo}deg)`;
+}
+
+function tickTrajetoAoVivo(){
+  atualizarCronometroSaiu();
+  atualizarTrajeto();
+}
+
+function aplicarPedidoNaTela(p){
+  document.getElementById('manifestId').textContent = 'Pedido #' + p.numero;
+  document.getElementById('infoNumero').textContent = '#' + p.numero;
+  document.getElementById('infoNome').textContent = p.nome;
+  document.getElementById('infoEndereco').textContent = p.endereco;
+
+  for(let i = 1; i <= 5; i++){
+    marcarNode('node' + i, i < p.stage ? 'done' : (i === p.stage ? 'active' : null));
+    const tsCampo = 'ts' + i;
+    const timeEl = document.getElementById('time' + i);
+    timeEl.classList.remove('live');
+    if(i === 3 && p[tsCampo] && (p.stage === 3)){
+      // etapa "saiu para entrega" ativa: mostra cronômetro ao vivo, não hora fixa
+      atualizarCronometroSaiu();
+    } else {
+      timeEl.textContent = p[tsCampo] ? fmtHora(p[tsCampo]) : '—';
+    }
+  }
+  if(p.stage <= 5) marcarNode('node' + p.stage, p.stage === 5 ? 'done' : 'active');
+
+  pararCronometroAoVivo();
+  atualizarTrajeto();
+  if(p.stage === 3){
+    liveTimerInterval = setInterval(tickTrajetoAoVivo, 3000);
+  }
+
+  statusPill.textContent = statusTextos[p.stage].pill;
+  statusPill.classList.remove('live','arrived');
+  if(p.stage === 3 || p.stage === 4) statusPill.classList.add('live');
+  if(p.stage === 5) statusPill.classList.add('arrived');
+  mainTitle.textContent = statusTextos[p.stage].titulo(p.nome ? p.nome.split(' ')[0] : '');
+
+  document.getElementById('arrivalBanner').classList.toggle('show', p.stage === 4);
+
+  if(p.recebedor){
+    document.getElementById('infoRecebedor').textContent = p.recebedor;
+    document.getElementById('infoRecebedorRow').style.display = 'flex';
+    document.getElementById('infoDataHora').textContent = fmtDataHora(p.ts5);
+    document.getElementById('infoDataHoraRow').style.display = 'flex';
+  } else {
+    document.getElementById('infoRecebedorRow').style.display = 'none';
+    document.getElementById('infoDataHoraRow').style.display = 'none';
+  }
+
+  document.getElementById('adminActions').style.display = modoLoja ? 'flex' : 'none';
+}
+
+// ---------------------------------------------------------------------------
+// Painel de status — regras de quem pode fazer o quê:
+// - "Preparando" e "Saiu para entrega": só a loja
+// - "Chegou": loja OU entregador
+// - "Entregue" (com nome de quem recebeu): loja OU entregador
+// - Cliente: nunca vê nenhum botão, só acompanha
+// ---------------------------------------------------------------------------
+function atualizarPainelStatus(){
+  if(!pedidoAtivo){
+    devLabel.textContent = 'Painel de status — selecione um pedido';
+    devBtn.disabled = true;
+    devBtn.style.display = 'block';
+    document.getElementById('readonlyMsg').style.display = 'none';
+    document.getElementById('devPanel').style.opacity = '.4';
+    document.getElementById('devPanel').style.pointerEvents = 'none';
+    return;
+  }
+
+  document.getElementById('devPanel').style.opacity = '1';
+  document.getElementById('devPanel').style.pointerEvents = 'auto';
+  document.getElementById('fieldRecebedor').style.display = 'none';
+  document.getElementById('readonlyMsg').style.display = 'none';
+  devBtn.style.display = 'block';
+  devBtn.disabled = false;
+  devBtn.className = 'action-btn';
+  waArrivalBtn.style.display = 'none';
+  notifyBtn.style.display = 'block';
+  atualizarBotaoNotificar();
+
+  const podeAgirNestaEtapa =
+    (stage === 1 && modoLoja) ||
+    (stage === 2 && modoLoja) ||
+    (stage === 3 && (modoLoja || modoEntregador)) ||
+    (stage === 4 && (modoLoja || modoEntregador));
+
+  if(!modoLoja && !modoEntregador){
+    // visão do cliente: nunca mostra o painel de ações
+    document.getElementById('devPanel').style.display = 'none';
+    return;
+  }
+
+  if(!podeAgirNestaEtapa && stage < 5){
+    devBtn.style.display = 'none';
+    document.getElementById('readonlyMsg').style.display = 'block';
+    document.getElementById('readonlyMsg').textContent = 'Só a loja pode avançar esta etapa. Você acompanha, igual ao cliente.';
+    devLabel.textContent = 'Pedido #' + pedidoAtivo.numero;
+    return;
+  }
+
+  if(stage === 1){
+    devLabel.textContent = 'Pedido #' + pedidoAtivo.numero;
+    devBtn.textContent = 'Marcar: preparando';
+    devBtn.onclick = () => avancarStatusPara(2);
+  } else if(stage === 2){
+    devLabel.textContent = 'Pedido #' + pedidoAtivo.numero;
+    devBtn.textContent = 'Marcar: saiu para entrega';
+    devBtn.onclick = () => avancarStatusPara(3);
+  } else if(stage === 3){
+    devLabel.textContent = 'Pedido #' + pedidoAtivo.numero;
+    devBtn.textContent = '🔔 Marcar: chegou';
+    devBtn.classList.add('chegou-btn');
+    devBtn.onclick = () => avancarStatusPara(4);
+  } else if(stage === 4){
+    devLabel.textContent = 'Pedido #' + pedidoAtivo.numero + ' — confirme quem recebeu';
+    document.getElementById('fieldRecebedor').style.display = 'block';
+    document.getElementById('fRecebedor').value = pedidoAtivo.recebedor || '';
+    document.getElementById('fRecebedor').disabled = false;
+    devBtn.textContent = 'Confirmar entrega';
+    devBtn.onclick = confirmarEntregaFinal;
+    if(pedidoAtivo.telefoneDigits){
+      waArrivalBtn.style.display = 'block';
+      waArrivalBtn.href = linkAvisoChegada(pedidoAtivo);
+    }
+  } else if(stage === 5){
+    devLabel.textContent = 'Pedido finalizado';
+    document.getElementById('fieldRecebedor').style.display = 'block';
+    document.getElementById('fRecebedor').value = pedidoAtivo.recebedor || '';
+    document.getElementById('fRecebedor').disabled = true;
+    devBtn.disabled = true;
+    devBtn.textContent = 'Entrega confirmada ✓';
+  }
+}
+
+async function avancarStatusPara(novoStage){
+  if(!pedidoAtivo) return;
+  const campoTs = 'ts' + novoStage;
+  const atualizado = { ...pedidoAtivo, stage: novoStage, [campoTs]: Date.now() };
+  await salvarPedido(atualizado);
+}
+
+async function confirmarEntregaFinal(){
+  if(!pedidoAtivo || stage !== 4) return;
+  const recebedor = document.getElementById('fRecebedor').value.trim();
+  if(!recebedor){
+    devLabel.textContent = 'Informe o nome de quem recebeu antes de confirmar.';
+    return;
+  }
+  const atualizado = { ...pedidoAtivo, stage: 5, recebedor, ts5: Date.now() };
+  await salvarPedido(atualizado);
+}
+
+// Mensagem de "chegou" bem chamativa — WhatsApp não permite fonte grande nem
+// animação de verdade, então o efeito é feito com negrito, espaçamento, caixa
+// alta e emojis repetidos, que é o mais "gritante" que o formato permite.
+function linkAvisoChegada(p){
+  const msg =
+    '🔔🔔🔔🔔🔔🔔🔔🔔\n\n' +
+    '*C H E G O U !* 📦\n\n' +
+    '🔔🔔🔔🔔🔔🔔🔔🔔\n\n' +
+    'Oi, ' + (p.nome ? p.nome.split(' ')[0] : '') + '! Seu pedido *#' + p.numero + '* está *NA SUA PORTA* agora! 🚪✨\n\n' +
+    '_O entregador está te aguardando._';
+  return 'https://wa.me/' + p.telefoneDigits + '?text=' + encodeURIComponent(msg);
+}
+
+// Botão de notificar cliente — sempre pronto com a mensagem certa da etapa atual
+function atualizarBotaoNotificar(){
+  if(!pedidoAtivo || !pedidoAtivo.telefoneDigits){ notifyBtn.style.display = 'none'; return; }
+  const mensagens = {
+    1: 'Oi, ' + pedidoAtivo.nome.split(' ')[0] + '! Seu pedido #' + pedidoAtivo.numero + ' foi confirmado 📦.',
+    2: 'Seu pedido #' + pedidoAtivo.numero + ' está sendo preparado 👨‍🍳',
+    3: 'Seu pedido #' + pedidoAtivo.numero + ' saiu para entrega 🛵',
+    4: '🔔 Seu pedido #' + pedidoAtivo.numero + ' chegou!',
+    5: 'Seu pedido #' + pedidoAtivo.numero + ' foi entregue! Recebido por ' + (pedidoAtivo.recebedor||'') + '. Obrigado 🎉'
+  };
+  const msg = mensagens[pedidoAtivo.stage] + ' Acompanhe em: ' + (pedidoAtivo.urlCurto || pedidoAtivo.url);
+  notifyBtn.href = 'https://wa.me/' + pedidoAtivo.telefoneDigits + '?text=' + encodeURIComponent(msg);
+}
+
+// ---------------------------------------------------------------------------
+// Visualização por link: loja (lista + cria pedidos) / entregador (avança status) / cliente (só vê)
+// ---------------------------------------------------------------------------
+function assinarPedidoUnico(numero){
+  onSnapshot(doc(db, 'pedidos', numero), (snap) => {
+    if(!snap.exists()) return;
+    const p = snap.data();
+    pedidoAtivo = p;
+    stage = p.stage;
+    aplicarPedidoNaTela(p);
+    if(modoEntregador) atualizarPainelStatus();
+  }, (err) => {
+    setStatus('Erro ao conectar no banco de dados: ' + err.message, 'err');
+  });
+}
+
+(function aplicarVisualizacao(){
+  if(window.__rastreioBloqueado) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const temPedido = params.has('numero');
+  const isEntregador = params.get('entregador') === '1';
+
+  if(!temPedido){
+    modoLoja = true;
+    assinarListaPedidos();
+    atualizarPainelStatus();
+    return;
+  }
+
+  document.getElementById('orderCard').style.display = 'none';
+  document.getElementById('entregadorCard').style.display = 'none';
+  document.getElementById('hamburgerBtn').style.display = 'none';
+  modoEntregador = isEntregador;
+
+  const numero = params.get('numero');
+
+  pedidoAtivo = {
+    numero,
+    nome: params.get('nome') || '',
+    endereco: params.get('endereco') || '',
+    telefoneDigits: params.get('tel') || '',
+    url: window.location.origin + window.location.pathname + '?' + params.toString(),
+    urlCurto: '',
+    stage: 1,
+    recebedor: '',
+    criadoEm: Date.now(),
+    ts1: Date.now(), ts2: null, ts3: null, ts4: null, ts5: null
+  };
+  stage = pedidoAtivo.stage;
+  aplicarPedidoNaTela(pedidoAtivo);
+  atualizarPainelStatus();
+
+  assinarPedidoUnico(numero);
+})();
+
+Object.assign(window, {
+  finalizarCompra, copiarMensagem, enviarParaEntregador, selecionarPedido,
+  abrirMenuPedidos, fecharMenuPedidos,
+  abrirModalEdicao, fecharModalEdicao, salvarEdicaoPedido, excluirPedidoAtivo,
+  paginaAnterior, paginaSeguinte
+});
+window.__firebaseReady = true;
+</script>
+</body>
+</html>
